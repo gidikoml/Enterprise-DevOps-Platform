@@ -1,0 +1,9 @@
+replicaCount: 2
+
+image:
+  repository: enterprise-devops-platform
+  tag: latest
+
+service:
+  type: NodePort
+  port: 5000

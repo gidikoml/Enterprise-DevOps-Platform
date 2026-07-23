@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: enterprise-platform
+
+spec:
+
+  replicas: {{ .Values.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: enterprise-platform
+
+  template:
+
+    metadata:
+      labels:
+        app: enterprise-platform
+
+    spec:
+
+      containers:
+
+      - name: app
+
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+
+        ports:
+
+        - containerPort: 5000
