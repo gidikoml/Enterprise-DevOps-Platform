@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: enterprise-platform
+  namespace: enterprise-devops
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: enterprise-platform
+
+  template:
+    metadata:
+      labels:
+        app: enterprise-platform
+
+    spec:
+      containers:
+      - name: flask-app
+        image: enterprise-devops-platform:latest
+        imagePullPolicy: Never
+
+        ports:
+        - containerPort: 5000
