@@ -14,6 +14,15 @@ pipeline {
             }
         }
 
+        stage('Pytest') {
+            steps {
+                sh '''
+                    python3 -m pip install --no-cache-dir -r app/requirements.txt
+                    python3 -m pytest app/tests -v
+                '''
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 script {
