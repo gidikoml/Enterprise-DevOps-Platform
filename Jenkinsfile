@@ -53,10 +53,25 @@ pipeline {
             }
         }
 
-        stage('Verify Image') {
+        stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                    docker images ${IMAGE_NAME}
+                    kubectl set image deployment/enterprise-platform \
+                      enterprise-platform=${IMAGE_NAME}:${IMAGE_TAG} \
+                      -n enterprise-devops
+
+                    kubectl rollout status deployment/enterprise-platform \
+                      -n enterprise-devops \
+                      --timeout=120s
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                sh '''
+                    kubectl get pods -n enterprise-devops
+                    kubectl get deployment enterprise-platform -n enterprise-devops
                 '''
             }
         }
@@ -64,8 +79,10 @@ pipeline {
     }
 
     post {
+
         success {
-            echo "Image pushed successfully: ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "Pipeline completed successfully!"
+            echo "Image deployed: ${IMAGE_NAME}:${IMAGE_TAG}"
         }
 
         failure {
