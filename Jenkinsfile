@@ -25,9 +25,18 @@ pipeline {
                               -Dsonar.projectKey=enterprise-devops-platform \
                               -Dsonar.projectName=Enterprise-DevOps-Platform \
                               -Dsonar.sources=app \
-                              -Dsonar.sourceEncoding=UTF-8
+                              -Dsonar.sourceEncoding=UTF-8 \
+                              -Dsonar.python.version=3.11
                         """
                     }
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
