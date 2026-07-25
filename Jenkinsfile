@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE_NAME = "enterprise-devops-platform"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+    }
+
     stages {
 
         stage('Checkout') {
@@ -9,34 +14,46 @@ pipeline {
             }
         }
 
-        stage('Verify Environment') {
+        stage('Verify Files') {
             steps {
                 sh '''
-                    echo "Jenkins worker information"
-                    whoami
                     pwd
-                    java -version
-                '''
-            }
-        }
-
-        stage('Verify Project Files') {
-            steps {
-                sh '''
                     ls -la
                     ls -la app
                 '''
             }
         }
+
+        stage('Build Docker Image') {
+            steps {
+                dir('app') {
+                    sh '''
+                        docker build \
+                          -t ${IMAGE_NAME}:${IMAGE_TAG} \
+                          -t ${IMAGE_NAME}:latest \
+                          .
+                    '''
+                }
+            }
+        }
+
+        stage('Verify Docker Image') {
+            steps {
+                sh '''
+                    docker images ${IMAGE_NAME}
+                '''
+            }
+        }
+
     }
 
     post {
         success {
-            echo 'Pipeline completed successfully!'
+            echo "Docker image built successfully: ${IMAGE_NAME}:${IMAGE_TAG}"
         }
 
         failure {
-            echo 'Pipeline failed!'
+            echo "Pipeline failed."
         }
     }
 }
