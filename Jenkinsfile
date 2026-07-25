@@ -27,7 +27,10 @@ pipeline {
                       -r app/requirements.txt
 
                     .jenkins-venv/bin/python -m pytest \
-                      app/tests -v
+                      app/tests \
+                      -v \
+                      --cov=app \
+                      --cov-report=xml:coverage.xml
                 '''
             }
         }
@@ -44,7 +47,8 @@ pipeline {
                               -Dsonar.projectName=Enterprise-DevOps-Platform \
                               -Dsonar.sources=app \
                               -Dsonar.sourceEncoding=UTF-8 \
-                              -Dsonar.python.version=3.11
+                              -Dsonar.python.version=3.13 \
+                              -Dsonar.python.coverage.reportPaths=coverage.xml
                         """
                     }
                 }
@@ -137,6 +141,10 @@ pipeline {
                     kubectl get deployment \
                       enterprise-platform \
                       -n enterprise-devops
+
+                    kubectl get service \
+                      enterprise-platform-service \
+                      -n enterprise-devops
                 '''
             }
         }
@@ -163,6 +171,7 @@ pipeline {
     }
 
     post {
+
         success {
             echo "Pipeline completed successfully!"
             echo "Image deployed: ${IMAGE_NAME}:${IMAGE_TAG}"
