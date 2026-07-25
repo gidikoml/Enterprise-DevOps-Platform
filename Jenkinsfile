@@ -76,10 +76,26 @@ pipeline {
             }
         }
 
+        stage('Smoke Test') {
+            steps {
+                sh '''
+                    kubectl port-forward service/enterprise-platform-service \
+                      5050:5000 \
+                      -n enterprise-devops > /tmp/port-forward.log 2>&1 &
+
+                    PF_PID=$!
+
+                    sleep 5
+
+                    curl -f http://127.0.0.1:5050/login
+
+                    kill $PF_PID || true
+                '''
+            }
+        }
     }
 
     post {
-
         success {
             echo "Pipeline completed successfully!"
             echo "Image deployed: ${IMAGE_NAME}:${IMAGE_TAG}"
