@@ -1,4 +1,29 @@
+# Python
 venv/
 __pycache__/
 *.pyc
 .env
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Helm
+*.tgz
+
+# Docker
+.docker/
+
+# IDE
+.vscode/
+.idea/
+# Local application data
+app/instance/
+app/static/uploads/images/*
+app/static/uploads/videos/*
+
+# Keep upload directories
+!app/static/uploads/images/.gitkeep
+!app/static/uploads/videos/.gitkeep

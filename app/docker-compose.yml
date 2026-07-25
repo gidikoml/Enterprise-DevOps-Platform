@@ -1,0 +1,44 @@
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: enterprise-postgres
+    restart: always
+
+    environment:
+      POSTGRES_DB: enterprise_db
+      POSTGRES_USER: enterprise_user
+      POSTGRES_PASSWORD: enterprise_password
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U enterprise_user -d enterprise_db
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  web:
+    build: .
+    container_name: enterprise-web
+    restart: always
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    env_file:
+      - .env
+
+    ports:
+      - "5000:5000"
+
+volumes:
+  postgres_data:

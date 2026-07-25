@@ -1,0 +1,52 @@
+body {
+
+    font-family: Arial, sans-serif;
+
+    margin: 40px;
+
+}
+
+
+h1 {
+
+    color: darkblue;
+
+}
+
+
+form {
+
+    width: 400px;
+
+}
+
+
+input {
+
+    width: 100%;
+
+    padding: 8px;
+
+}
+
+
+button {
+
+    background-color: green;
+
+    color: white;
+
+    padding: 10px 20px;
+
+    border: none;
+
+    cursor: pointer;
+
+}
+
+
+button:hover {
+
+    background-color: darkgreen;
+
+}
