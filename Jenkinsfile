@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "enterprise-devops-platform"
+        IMAGE_NAME = "amenvi/enterprise-devops-platform"
         IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
@@ -11,16 +11,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-            }
-        }
-
-        stage('Verify Files') {
-            steps {
-                sh '''
-                    pwd
-                    ls -la
-                    ls -la app
-                '''
             }
         }
 
@@ -37,7 +27,33 @@ pipeline {
             }
         }
 
-        stage('Verify Docker Image') {
+        stage('Docker Hub Login') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKERHUB_USER',
+                        passwordVariable: 'DOCKERHUB_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        echo "$DOCKERHUB_TOKEN" | \
+                        docker login -u "$DOCKERHUB_USER" --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                sh '''
+                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    docker push ${IMAGE_NAME}:latest
+                '''
+            }
+        }
+
+        stage('Verify Image') {
             steps {
                 sh '''
                     docker images ${IMAGE_NAME}
@@ -49,11 +65,15 @@ pipeline {
 
     post {
         success {
-            echo "Docker image built successfully: ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "Image pushed successfully: ${IMAGE_NAME}:${IMAGE_TAG}"
         }
 
         failure {
             echo "Pipeline failed."
+        }
+
+        always {
+            sh 'docker logout || true'
         }
     }
 }
