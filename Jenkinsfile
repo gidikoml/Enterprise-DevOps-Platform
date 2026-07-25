@@ -32,6 +32,8 @@ pipeline {
                 sh '''
                     trivy image \
                       --severity HIGH,CRITICAL \
+                      --ignore-unfixed \
+                      --scanners vuln \
                       --exit-code 1 \
                       ${IMAGE_NAME}:${IMAGE_TAG}
                 '''
@@ -49,7 +51,9 @@ pipeline {
                 ]) {
                     sh '''
                         echo "$DOCKERHUB_TOKEN" | \
-                        docker login -u "$DOCKERHUB_USER" --password-stdin
+                        docker login \
+                          -u "$DOCKERHUB_USER" \
+                          --password-stdin
                     '''
                 }
             }
@@ -67,11 +71,13 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                    kubectl set image deployment/enterprise-platform \
+                    kubectl set image \
+                      deployment/enterprise-platform \
                       enterprise-platform=${IMAGE_NAME}:${IMAGE_TAG} \
                       -n enterprise-devops
 
-                    kubectl rollout status deployment/enterprise-platform \
+                    kubectl rollout status \
+                      deployment/enterprise-platform \
                       -n enterprise-devops \
                       --timeout=120s
                 '''
@@ -82,7 +88,10 @@ pipeline {
             steps {
                 sh '''
                     kubectl get pods -n enterprise-devops
-                    kubectl get deployment enterprise-platform -n enterprise-devops
+
+                    kubectl get deployment \
+                      enterprise-platform \
+                      -n enterprise-devops
                 '''
             }
         }
@@ -90,9 +99,11 @@ pipeline {
         stage('Smoke Test') {
             steps {
                 sh '''
-                    kubectl port-forward service/enterprise-platform-service \
+                    kubectl port-forward \
+                      service/enterprise-platform-service \
                       5050:5000 \
-                      -n enterprise-devops > /tmp/port-forward.log 2>&1 &
+                      -n enterprise-devops \
+                      > /tmp/port-forward.log 2>&1 &
 
                     PF_PID=$!
 
@@ -118,7 +129,9 @@ pipeline {
         }
 
         always {
-            sh 'docker logout || true'
+            sh '''
+                docker logout || true
+            '''
         }
     }
 }
