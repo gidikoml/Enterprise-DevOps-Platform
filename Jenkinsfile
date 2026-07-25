@@ -27,6 +27,17 @@ pipeline {
             }
         }
 
+        stage('Trivy Security Scan') {
+            steps {
+                sh '''
+                    trivy image \
+                      --severity HIGH,CRITICAL \
+                      --exit-code 1 \
+                      ${IMAGE_NAME}:${IMAGE_TAG}
+                '''
+            }
+        }
+
         stage('Docker Hub Login') {
             steps {
                 withCredentials([
@@ -96,6 +107,7 @@ pipeline {
     }
 
     post {
+
         success {
             echo "Pipeline completed successfully!"
             echo "Image deployed: ${IMAGE_NAME}:${IMAGE_TAG}"
