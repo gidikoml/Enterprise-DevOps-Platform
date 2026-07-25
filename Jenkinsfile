@@ -17,8 +17,17 @@ pipeline {
         stage('Pytest') {
             steps {
                 sh '''
-                    python3 -m pip install --no-cache-dir -r app/requirements.txt
-                    python3 -m pytest app/tests -v
+                    rm -rf .jenkins-venv
+
+                    python3 -m venv .jenkins-venv
+
+                    .jenkins-venv/bin/python -m pip install --upgrade pip
+
+                    .jenkins-venv/bin/python -m pip install \
+                      -r app/requirements.txt
+
+                    .jenkins-venv/bin/python -m pytest \
+                      app/tests -v
                 '''
             }
         }
@@ -154,7 +163,6 @@ pipeline {
     }
 
     post {
-
         success {
             echo "Pipeline completed successfully!"
             echo "Image deployed: ${IMAGE_NAME}:${IMAGE_TAG}"
