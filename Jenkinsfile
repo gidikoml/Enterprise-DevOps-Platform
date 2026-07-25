@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        sonarQube 'SonarScanner'
-    }
-
     environment {
         IMAGE_NAME = "amenvi/enterprise-devops-platform"
         IMAGE_TAG = "${BUILD_NUMBER}"
@@ -20,14 +16,18 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        sonar-scanner \
-                          -Dsonar.projectKey=enterprise-devops-platform \
-                          -Dsonar.projectName=Enterprise-DevOps-Platform \
-                          -Dsonar.sources=app \
-                          -Dsonar.sourceEncoding=UTF-8
-                    '''
+                script {
+                    def scannerHome = tool 'SonarScanner'
+
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            ${scannerHome}/bin/sonar-scanner \
+                              -Dsonar.projectKey=enterprise-devops-platform \
+                              -Dsonar.projectName=Enterprise-DevOps-Platform \
+                              -Dsonar.sources=app \
+                              -Dsonar.sourceEncoding=UTF-8
+                        """
+                    }
                 }
             }
         }
