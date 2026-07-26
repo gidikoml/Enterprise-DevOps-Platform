@@ -1,0 +1,19 @@
+grafana:
+  persistence:
+    enabled: true
+    type: sts
+    accessModes:
+      - ReadWriteOnce
+    size: 5Gi
+
+  envFromSecret: grafana-smtp-secret
+
+  grafana.ini:
+    smtp:
+      enabled: true
+      host: smtp.gmail.com:587
+      user: aroyovo376@gmail.com
+      password: $__env{GF_SMTP_PASSWORD}
+      skip_verify: false
+      from_address: aroyovo376@gmail.com
+      from_name: Grafana Alerts
