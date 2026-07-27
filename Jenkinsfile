@@ -47,7 +47,7 @@ pipeline {
                               -Dsonar.projectName=Enterprise-DevOps-Platform \
                               -Dsonar.sources=app \
                               -Dsonar.sourceEncoding=UTF-8 \
-                              -Dsonar.python.version=3.13 \
+                              -Dsonar.python.version=3.11 \
                               -Dsonar.python.coverage.reportPaths=coverage.xml
                         """
                     }
