@@ -1,0 +1,52 @@
+# =========================
+# DEV
+# =========================
+apiVersion: v1
+kind: Service
+metadata:
+  name: enterprise-platform-service
+  namespace: enterprise-dev
+spec:
+  selector:
+    app: enterprise-platform
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+  type: ClusterIP
+
+---
+# =========================
+# STAGING
+# =========================
+apiVersion: v1
+kind: Service
+metadata:
+  name: enterprise-platform-service
+  namespace: enterprise-staging
+spec:
+  selector:
+    app: enterprise-platform
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+  type: ClusterIP
+
+---
+# =========================
+# PROD
+# =========================
+apiVersion: v1
+kind: Service
+metadata:
+  name: enterprise-platform-service
+  namespace: enterprise-prod
+spec:
+  selector:
+    app: enterprise-platform
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+  type: LoadBalancer

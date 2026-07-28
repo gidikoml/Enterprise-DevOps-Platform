@@ -2,8 +2,16 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "amenvi/enterprise-devops-platform"
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        AWS_REGION   = "us-east-1"
+        AWS_ACCOUNT  = "519747128244"
+        EKS_CLUSTER  = "enterprise-devops-cluster"
+
+        ECR_REGISTRY = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        IMAGE_NAME   = "enterprise-devops-platform"
+        IMAGE_TAG    = "${BUILD_NUMBER}"
+
+        ECR_IMAGE    = "${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+        ECR_LATEST   = "${ECR_REGISTRY}/${IMAGE_NAME}:latest"
     }
 
     stages {
@@ -69,7 +77,6 @@ pipeline {
                     sh '''
                         docker build \
                           -t ${IMAGE_NAME}:${IMAGE_TAG} \
-                          -t ${IMAGE_NAME}:latest \
                           .
                     '''
                 }
@@ -89,82 +96,184 @@ pipeline {
             }
         }
 
-        stage('Docker Hub Login') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKERHUB_USER',
-                        passwordVariable: 'DOCKERHUB_TOKEN'
-                    )
-                ]) {
-                    sh '''
-                        echo "$DOCKERHUB_TOKEN" | \
-                        docker login \
-                          -u "$DOCKERHUB_USER" \
-                          --password-stdin
-                    '''
-                }
-            }
-        }
-
-        stage('Push Docker Image') {
+        stage('Configure AWS / EKS') {
             steps {
                 sh '''
-                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                    docker push ${IMAGE_NAME}:latest
+                    aws sts get-caller-identity
+
+                    aws eks update-kubeconfig \
+                      --region ${AWS_REGION} \
+                      --name ${EKS_CLUSTER}
+
+                    kubectl get nodes
                 '''
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('ECR Login') {
+            steps {
+                sh '''
+                    aws ecr get-login-password \
+                      --region ${AWS_REGION} \
+                      | docker login \
+                          --username AWS \
+                          --password-stdin ${ECR_REGISTRY}
+                '''
+            }
+        }
+
+        stage('Push Image to ECR') {
+            steps {
+                sh '''
+                    docker tag \
+                      ${IMAGE_NAME}:${IMAGE_TAG} \
+                      ${ECR_IMAGE}
+
+                    docker tag \
+                      ${IMAGE_NAME}:${IMAGE_TAG} \
+                      ${ECR_LATEST}
+
+                    docker push ${ECR_IMAGE}
+                    docker push ${ECR_LATEST}
+                '''
+            }
+        }
+
+        stage('Deploy DEV') {
             steps {
                 sh '''
                     kubectl set image \
                       deployment/enterprise-platform \
-                      enterprise-platform=${IMAGE_NAME}:${IMAGE_TAG} \
-                      -n enterprise-devops
+                      enterprise-platform=${ECR_IMAGE} \
+                      -n enterprise-dev
 
                     kubectl rollout status \
                       deployment/enterprise-platform \
-                      -n enterprise-devops \
-                      --timeout=120s
+                      -n enterprise-dev \
+                      --timeout=180s
                 '''
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Test DEV') {
             steps {
                 sh '''
-                    kubectl get pods -n enterprise-devops
+                    kubectl get pods -n enterprise-dev
 
-                    kubectl get deployment \
-                      enterprise-platform \
-                      -n enterprise-devops
-
-                    kubectl get service \
-                      enterprise-platform-service \
-                      -n enterprise-devops
-                '''
-            }
-        }
-
-        stage('Smoke Test') {
-            steps {
-                sh '''
                     kubectl port-forward \
                       service/enterprise-platform-service \
-                      5050:5000 \
-                      -n enterprise-devops \
-                      > /tmp/port-forward.log 2>&1 &
+                      5051:80 \
+                      -n enterprise-dev \
+                      > /tmp/dev-port-forward.log 2>&1 &
 
                     PF_PID=$!
 
                     sleep 5
 
-                    curl -f http://127.0.0.1:5050/login
+                    curl -f http://127.0.0.1:5051/login
 
                     kill $PF_PID || true
+                '''
+            }
+        }
+
+        stage('Deploy STAGING') {
+            steps {
+                sh '''
+                    kubectl set image \
+                      deployment/enterprise-platform \
+                      enterprise-platform=${ECR_IMAGE} \
+                      -n enterprise-staging
+
+                    kubectl rollout status \
+                      deployment/enterprise-platform \
+                      -n enterprise-staging \
+                      --timeout=180s
+                '''
+            }
+        }
+
+        stage('Test STAGING') {
+            steps {
+                sh '''
+                    kubectl get pods -n enterprise-staging
+
+                    kubectl port-forward \
+                      service/enterprise-platform-service \
+                      5052:80 \
+                      -n enterprise-staging \
+                      > /tmp/staging-port-forward.log 2>&1 &
+
+                    PF_PID=$!
+
+                    sleep 5
+
+                    curl -f http://127.0.0.1:5052/login
+
+                    kill $PF_PID || true
+                '''
+            }
+        }
+
+        stage('Approve PROD') {
+            steps {
+                timeout(time: 15, unit: 'MINUTES') {
+                    input(
+                        message: 'Deploy this build to PRODUCTION?',
+                        ok: 'Deploy'
+                    )
+                }
+            }
+        }
+
+        stage('Deploy PROD') {
+            steps {
+                sh '''
+                    kubectl set image \
+                      deployment/enterprise-platform \
+                      enterprise-platform=${ECR_IMAGE} \
+                      -n enterprise-prod
+
+                    kubectl rollout status \
+                      deployment/enterprise-platform \
+                      -n enterprise-prod \
+                      --timeout=180s
+                '''
+            }
+        }
+
+        stage('Verify PROD') {
+            steps {
+                sh '''
+                    kubectl get pods -n enterprise-prod
+
+                    kubectl get deployment \
+                      enterprise-platform \
+                      -n enterprise-prod
+
+                    kubectl get service \
+                      enterprise-platform-service \
+                      -n enterprise-prod
+                '''
+            }
+        }
+
+        stage('Smoke Test PROD') {
+            steps {
+                sh '''
+                    PROD_URL=$(kubectl get svc \
+                      enterprise-platform-service \
+                      -n enterprise-prod \
+                      -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
+                    echo "Production URL: http://${PROD_URL}"
+
+                    curl \
+                      --retry 12 \
+                      --retry-delay 10 \
+                      --retry-connrefused \
+                      -f \
+                      http://${PROD_URL}/login
                 '''
             }
         }
@@ -174,7 +283,8 @@ pipeline {
 
         success {
             echo "Pipeline completed successfully!"
-            echo "Image deployed: ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "Image deployed: ${ECR_IMAGE}"
+            echo "DEV -> STAGING -> PROD promotion completed."
         }
 
         failure {
@@ -183,7 +293,7 @@ pipeline {
 
         always {
             sh '''
-                docker logout || true
+                docker logout ${ECR_REGISTRY} || true
             '''
         }
     }

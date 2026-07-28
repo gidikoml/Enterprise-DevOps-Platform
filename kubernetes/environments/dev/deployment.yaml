@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: enterprise-platform
+  namespace: enterprise-dev
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: enterprise-platform
+
+  template:
+    metadata:
+      labels:
+        app: enterprise-platform
+        environment: dev
+
+    spec:
+      containers:
+        - name: enterprise-platform
+          image: 519747128244.dkr.ecr.us-east-1.amazonaws.com/enterprise-devops-platform:latest
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 5000
+
+          readinessProbe:
+            httpGet:
+              path: /login
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /login
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 10
