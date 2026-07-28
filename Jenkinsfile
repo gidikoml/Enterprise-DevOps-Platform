@@ -2,16 +2,21 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION   = "us-east-1"
-        AWS_ACCOUNT  = "519747128244"
-        EKS_CLUSTER  = "enterprise-devops-cluster"
+        AWS_REGION  = "us-east-1"
+        AWS_ACCOUNT = "519747128244"
+        EKS_CLUSTER = "enterprise-devops-cluster"
 
         ECR_REGISTRY = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com"
         IMAGE_NAME   = "enterprise-devops-platform"
         IMAGE_TAG    = "${BUILD_NUMBER}"
 
-        ECR_IMAGE    = "${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-        ECR_LATEST   = "${ECR_REGISTRY}/${IMAGE_NAME}:latest"
+        ECR_IMAGE  = "${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+        ECR_LATEST = "${ECR_REGISTRY}/${IMAGE_NAME}:latest"
+
+        // Jenkins credential ID:
+        // Username = AWS Access Key ID
+        // Password = AWS Secret Access Key
+        AWS_CREDS = credentials('aws-credentials')
     }
 
     stages {
@@ -99,11 +104,21 @@ pipeline {
         stage('Configure AWS / EKS') {
             steps {
                 sh '''
+                    export AWS_ACCESS_KEY_ID="$AWS_CREDS_USR"
+                    export AWS_SECRET_ACCESS_KEY="$AWS_CREDS_PSW"
+                    export AWS_DEFAULT_REGION="$AWS_REGION"
+
+                    echo "Checking AWS authentication..."
+
                     aws sts get-caller-identity
+
+                    echo "Configuring kubeconfig..."
 
                     aws eks update-kubeconfig \
                       --region ${AWS_REGION} \
                       --name ${EKS_CLUSTER}
+
+                    echo "Checking EKS nodes..."
 
                     kubectl get nodes
                 '''
@@ -113,6 +128,10 @@ pipeline {
         stage('ECR Login') {
             steps {
                 sh '''
+                    export AWS_ACCESS_KEY_ID="$AWS_CREDS_USR"
+                    export AWS_SECRET_ACCESS_KEY="$AWS_CREDS_PSW"
+                    export AWS_DEFAULT_REGION="$AWS_REGION"
+
                     aws ecr get-login-password \
                       --region ${AWS_REGION} \
                       | docker login \
@@ -134,6 +153,7 @@ pipeline {
                       ${ECR_LATEST}
 
                     docker push ${ECR_IMAGE}
+
                     docker push ${ECR_LATEST}
                 '''
             }
@@ -142,6 +162,10 @@ pipeline {
         stage('Deploy DEV') {
             steps {
                 sh '''
+                    export AWS_ACCESS_KEY_ID="$AWS_CREDS_USR"
+                    export AWS_SECRET_ACCESS_KEY="$AWS_CREDS_PSW"
+                    export AWS_DEFAULT_REGION="$AWS_REGION"
+
                     kubectl set image \
                       deployment/enterprise-platform \
                       enterprise-platform=${ECR_IMAGE} \
@@ -168,11 +192,15 @@ pipeline {
 
                     PF_PID=$!
 
+                    trap 'kill $PF_PID 2>/dev/null || true' EXIT
+
                     sleep 5
 
                     curl -f http://127.0.0.1:5051/login
 
-                    kill $PF_PID || true
+                    kill $PF_PID 2>/dev/null || true
+
+                    trap - EXIT
                 '''
             }
         }
@@ -180,6 +208,10 @@ pipeline {
         stage('Deploy STAGING') {
             steps {
                 sh '''
+                    export AWS_ACCESS_KEY_ID="$AWS_CREDS_USR"
+                    export AWS_SECRET_ACCESS_KEY="$AWS_CREDS_PSW"
+                    export AWS_DEFAULT_REGION="$AWS_REGION"
+
                     kubectl set image \
                       deployment/enterprise-platform \
                       enterprise-platform=${ECR_IMAGE} \
@@ -206,11 +238,15 @@ pipeline {
 
                     PF_PID=$!
 
+                    trap 'kill $PF_PID 2>/dev/null || true' EXIT
+
                     sleep 5
 
                     curl -f http://127.0.0.1:5052/login
 
-                    kill $PF_PID || true
+                    kill $PF_PID 2>/dev/null || true
+
+                    trap - EXIT
                 '''
             }
         }
@@ -219,8 +255,8 @@ pipeline {
             steps {
                 timeout(time: 15, unit: 'MINUTES') {
                     input(
-                        message: 'Deploy this build to PRODUCTION?',
-                        ok: 'Deploy'
+                        message: 'DEV and STAGING passed. Deploy this build to PRODUCTION?',
+                        ok: 'Deploy to PROD'
                     )
                 }
             }
@@ -229,6 +265,10 @@ pipeline {
         stage('Deploy PROD') {
             steps {
                 sh '''
+                    export AWS_ACCESS_KEY_ID="$AWS_CREDS_USR"
+                    export AWS_SECRET_ACCESS_KEY="$AWS_CREDS_PSW"
+                    export AWS_DEFAULT_REGION="$AWS_REGION"
+
                     kubectl set image \
                       deployment/enterprise-platform \
                       enterprise-platform=${ECR_IMAGE} \
@@ -245,12 +285,15 @@ pipeline {
         stage('Verify PROD') {
             steps {
                 sh '''
+                    echo "PROD pods:"
                     kubectl get pods -n enterprise-prod
 
+                    echo "PROD deployment:"
                     kubectl get deployment \
                       enterprise-platform \
                       -n enterprise-prod
 
+                    echo "PROD service:"
                     kubectl get service \
                       enterprise-platform-service \
                       -n enterprise-prod
@@ -266,7 +309,13 @@ pipeline {
                       -n enterprise-prod \
                       -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 
-                    echo "Production URL: http://${PROD_URL}"
+                    if [ -z "$PROD_URL" ]; then
+                        echo "ERROR: Production LoadBalancer hostname not found."
+                        exit 1
+                    fi
+
+                    echo "Production URL:"
+                    echo "http://${PROD_URL}"
 
                     curl \
                       --retry 12 \
@@ -282,13 +331,20 @@ pipeline {
     post {
 
         success {
-            echo "Pipeline completed successfully!"
-            echo "Image deployed: ${ECR_IMAGE}"
-            echo "DEV -> STAGING -> PROD promotion completed."
+            echo "=========================================="
+            echo "PIPELINE COMPLETED SUCCESSFULLY"
+            echo "=========================================="
+            echo "Image: ${ECR_IMAGE}"
+            echo "DEV: deployed and tested"
+            echo "STAGING: deployed and tested"
+            echo "PROD: deployed and tested"
         }
 
         failure {
-            echo "Pipeline failed."
+            echo "=========================================="
+            echo "PIPELINE FAILED"
+            echo "=========================================="
+            echo "Check the failed stage logs."
         }
 
         always {
