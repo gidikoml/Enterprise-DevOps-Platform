@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -13,9 +14,8 @@ pipeline {
         ECR_IMAGE  = "${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
         ECR_LATEST = "${ECR_REGISTRY}/${IMAGE_NAME}:latest"
 
-        // Jenkins credential ID:
-        // Username = AWS Access Key ID
-        // Password = AWS Secret Access Key
+        KUBECONFIG = "${WORKSPACE}/.kube/config"
+
         AWS_CREDS = credentials('aws-credentials')
     }
 
@@ -109,17 +109,18 @@ pipeline {
                     export AWS_DEFAULT_REGION="$AWS_REGION"
 
                     echo "Checking AWS authentication..."
-
                     aws sts get-caller-identity
 
-                    echo "Configuring kubeconfig..."
+                    echo "Preparing Jenkins kubeconfig..."
+                    mkdir -p "$(dirname "$KUBECONFIG")"
 
+                    echo "Configuring EKS kubeconfig..."
                     aws eks update-kubeconfig \
-                      --region ${AWS_REGION} \
-                      --name ${EKS_CLUSTER}
+                      --region "$AWS_REGION" \
+                      --name "$EKS_CLUSTER" \
+                      --kubeconfig "$KUBECONFIG"
 
                     echo "Checking EKS nodes..."
-
                     kubectl get nodes
                 '''
             }
@@ -133,10 +134,10 @@ pipeline {
                     export AWS_DEFAULT_REGION="$AWS_REGION"
 
                     aws ecr get-login-password \
-                      --region ${AWS_REGION} \
+                      --region "$AWS_REGION" \
                       | docker login \
                           --username AWS \
-                          --password-stdin ${ECR_REGISTRY}
+                          --password-stdin "$ECR_REGISTRY"
                 '''
             }
         }
@@ -153,7 +154,6 @@ pipeline {
                       ${ECR_LATEST}
 
                     docker push ${ECR_IMAGE}
-
                     docker push ${ECR_LATEST}
                 '''
             }
@@ -348,9 +348,13 @@ pipeline {
         }
 
         always {
-            sh '''
-                docker logout ${ECR_REGISTRY} || true
-            '''
+            script {
+                if (env.ECR_REGISTRY) {
+                    sh '''
+                        docker logout ${ECR_REGISTRY} || true
+                    '''
+                }
+            }
         }
     }
 }
