@@ -6,6 +6,8 @@ metadata:
   namespace: enterprise-devops
 
 spec:
+  storageClassName: gp3
+
   accessModes:
     - ReadWriteOnce
 

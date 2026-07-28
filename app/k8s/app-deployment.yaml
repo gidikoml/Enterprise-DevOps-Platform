@@ -20,11 +20,13 @@ spec:
     spec:
       containers:
         - name: enterprise-platform
-          image: enterprise-devops-platform:v4
-          imagePullPolicy: Never
+
+          image: 519747128244.dkr.ecr.us-east-1.amazonaws.com/enterprise-devops-platform:latest
+          imagePullPolicy: Always
 
           ports:
             - containerPort: 5000
+              protocol: TCP
 
           envFrom:
             - configMapRef:
@@ -39,10 +41,14 @@ spec:
               port: 5000
             initialDelaySeconds: 10
             periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
 
           livenessProbe:
             httpGet:
               path: /login
               port: 5000
-            initialDelaySeconds: 20
+            initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3

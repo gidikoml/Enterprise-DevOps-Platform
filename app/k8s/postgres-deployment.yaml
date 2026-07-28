@@ -20,7 +20,6 @@ spec:
     spec:
       containers:
         - name: postgres
-
           image: postgres:16
 
           ports:
@@ -44,6 +43,9 @@ spec:
                 secretKeyRef:
                   name: enterprise-secret
                   key: POSTGRES_PASSWORD
+
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
 
           volumeMounts:
             - name: postgres-storage
