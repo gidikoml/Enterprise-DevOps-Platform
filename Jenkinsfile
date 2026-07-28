@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -182,6 +181,10 @@ pipeline {
         stage('Test DEV') {
             steps {
                 sh '''
+                    export AWS_ACCESS_KEY_ID="$AWS_CREDS_USR"
+                    export AWS_SECRET_ACCESS_KEY="$AWS_CREDS_PSW"
+                    export AWS_DEFAULT_REGION="$AWS_REGION"
+
                     kubectl get pods -n enterprise-dev
 
                     kubectl port-forward \
@@ -228,6 +231,10 @@ pipeline {
         stage('Test STAGING') {
             steps {
                 sh '''
+                    export AWS_ACCESS_KEY_ID="$AWS_CREDS_USR"
+                    export AWS_SECRET_ACCESS_KEY="$AWS_CREDS_PSW"
+                    export AWS_DEFAULT_REGION="$AWS_REGION"
+
                     kubectl get pods -n enterprise-staging
 
                     kubectl port-forward \
@@ -285,6 +292,10 @@ pipeline {
         stage('Verify PROD') {
             steps {
                 sh '''
+                    export AWS_ACCESS_KEY_ID="$AWS_CREDS_USR"
+                    export AWS_SECRET_ACCESS_KEY="$AWS_CREDS_PSW"
+                    export AWS_DEFAULT_REGION="$AWS_REGION"
+
                     echo "PROD pods:"
                     kubectl get pods -n enterprise-prod
 
@@ -304,6 +315,10 @@ pipeline {
         stage('Smoke Test PROD') {
             steps {
                 sh '''
+                    export AWS_ACCESS_KEY_ID="$AWS_CREDS_USR"
+                    export AWS_SECRET_ACCESS_KEY="$AWS_CREDS_PSW"
+                    export AWS_DEFAULT_REGION="$AWS_REGION"
+
                     PROD_URL=$(kubectl get svc \
                       enterprise-platform-service \
                       -n enterprise-prod \
